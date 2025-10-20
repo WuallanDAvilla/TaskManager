@@ -1,8 +1,8 @@
 'use client';
 
 import React, { memo, useCallback, useMemo } from 'react';
-import { useAuth } from './AuthProvider';
-import { useWorkspace } from './WorkspaceProvider';
+import { useAuth } from '../../providers/AuthProvider';
+import { useWorkspace } from '../../providers/WorkspaceProvider';
 
 const UserIcon = (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">

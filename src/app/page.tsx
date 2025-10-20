@@ -1,9 +1,9 @@
 'use client';
 
-import { TaskManager } from '../components/TaskManager';
-import { useAuth } from '../components/AuthProvider';
-import { useWorkspace } from '../components/WorkspaceProvider';
-import { Login } from '../components/Login';
+import { TaskManager } from '../components/tasks/TaskManager';
+import { useAuth } from '../providers/AuthProvider';
+import { useWorkspace } from '../providers/WorkspaceProvider';
+import { Login } from '../components/auth/Login';
 
 function FullPageSpinner() {
   return (

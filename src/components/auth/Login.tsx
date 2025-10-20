@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { auth } from '../../lib/firebase';
 
 const GoogleIcon = (
     <svg viewBox="0 0 48 48" className="h-6 w-6">

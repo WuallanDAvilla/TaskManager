@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { ThemeProvider } from '../components/ThemeProvider';
-import { AuthProvider } from '../components/AuthProvider';
-import { WorkspaceProvider } from '../components/WorkspaceProvider';
+import { ThemeProvider } from '../providers/ThemeProvider';
+import { AuthProvider } from '../providers/AuthProvider';
+import { WorkspaceProvider } from '../providers/WorkspaceProvider';
+import { ModalProvider } from '../providers/ModalProvider';
+import { GlobalKeyboardHandler } from '../components/layout/GlobalKeyboardHandler';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -23,7 +25,12 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider>
           <AuthProvider>
-            <WorkspaceProvider>{children}</WorkspaceProvider>
+            <WorkspaceProvider>
+              <ModalProvider>
+                {children}
+                <GlobalKeyboardHandler />
+              </ModalProvider>
+            </WorkspaceProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>
