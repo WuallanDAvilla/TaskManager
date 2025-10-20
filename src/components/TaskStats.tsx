@@ -8,9 +8,31 @@ interface TaskStatsProps {
         pending: number;
         completed: number;
     };
+    isLoading: boolean;
 }
 
-export const TaskStats = memo(function TaskStatsDisplay({ stats }: TaskStatsProps) {
+const StatsSkeleton = () => (
+    <div className="flex animate-pulse flex-wrap items-center gap-4 sm:gap-6">
+        <div className="flex items-baseline gap-2">
+            <span className="text-sm font-medium text-text-secondary">Total</span>
+            <span className="h-6 w-4 rounded-md bg-text-secondary/10"></span>
+        </div>
+        <div className="flex items-baseline gap-2">
+            <span className="text-sm font-medium text-text-secondary">Pendentes</span>
+            <span className="h-6 w-4 rounded-md bg-text-secondary/10"></span>
+        </div>
+        <div className="flex items-baseline gap-2">
+            <span className="text-sm font-medium text-text-secondary">Concluídas</span>
+            <span className="h-6 w-4 rounded-md bg-text-secondary/10"></span>
+        </div>
+    </div>
+);
+
+export const TaskStats = memo(function TaskStatsDisplay({ stats, isLoading }: TaskStatsProps) {
+    if (isLoading) {
+        return <StatsSkeleton />;
+    }
+
     const { total, pending, completed } = stats;
 
     return (

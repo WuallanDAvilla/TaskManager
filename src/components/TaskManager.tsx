@@ -1,79 +1,140 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+    collection,
+    query,
+    where,
+    onSnapshot,
+    addDoc,
+    doc,
+    updateDoc,
+    deleteDoc,
+    orderBy,
+} from 'firebase/firestore';
 import { Task, TaskStatus, TaskPriority, FilterStatus } from '../models/Task';
+import { database } from '../lib/firebase';
+import { useAuth } from './AuthProvider';
+import { useWorkspace } from './WorkspaceProvider';
 import { TaskList } from './TaskList';
 import { TaskForm } from './TaskForm';
 import { TaskManagerHeader } from './TaskManagerHeader';
 import { TaskFilters } from './TaskFilters';
 import { TaskStats } from './TaskStats';
 
-const STORAGE_KEY = 'task-manager-tasks';
-
 export function TaskManager() {
+    const { user } = useAuth();
+    const { currentWorkspaceId } = useWorkspace();
+
     const [tasks, setTasks] = useState<Task[]>([]);
     const [currentFilter, setCurrentFilter] = useState<FilterStatus>(FilterStatus.All);
-    const [isClient, setIsClient] = useState(false);
+    const [isLoadingTasks, setIsLoadingTasks] = useState(true);
 
     useEffect(() => {
-        setIsClient(true);
-        try {
-            const storedTasks = window.localStorage.getItem(STORAGE_KEY);
-            if (storedTasks) {
-                setTasks(JSON.parse(storedTasks));
-            }
-        } catch (error) {
-            console.error('Falha ao carregar tarefas do localStorage:', error);
+        if (!currentWorkspaceId) {
+            setTasks([]);
+            setIsLoadingTasks(false);
+            return;
         }
-    }, []);
 
-    useEffect(() => {
-        if (isClient) {
-            try {
-                window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-            } catch (error) {
-                console.error('Falha ao salvar tarefas no localStorage:', error);
-            }
-        }
-    }, [tasks, isClient]);
+        setIsLoadingTasks(true);
+        const tasksCollection = collection(database, 'tasks');
+        const tasksQuery = query(
+            tasksCollection,
+            where('contextId', '==', currentWorkspaceId),
+            orderBy('createdAt', 'desc'),
+        );
+
+        const unsubscribe = onSnapshot(
+            tasksQuery,
+            (snapshot) => {
+                const loadedTasks = snapshot.docs.map((document) => {
+                    const data = document.data();
+                    return {
+                        id: document.id,
+                        title: data.title,
+                        description: data.description,
+                        status: data.status,
+                        priority: data.priority,
+                        dueDate: data.dueDate,
+                        createdAt: data.createdAt,
+                        authorId: data.authorId,
+                        contextId: data.contextId,
+                    };
+                }) as Task[];
+                setTasks(loadedTasks);
+                setIsLoadingTasks(false);
+            },
+            (error) => {
+                console.error('Falha ao buscar tarefas:', error);
+                setIsLoadingTasks(false);
+            },
+        );
+
+        return () => unsubscribe();
+    }, [currentWorkspaceId]);
 
     const handleAddTask = useCallback(
-        (data: { title: string; description: string | null; priority: TaskPriority; dueDate: string | null }) => {
-            const newTask: Task = {
-                id: crypto.randomUUID(),
-                title: data.title,
-                description: data.description || null,
+        async (data: {
+            title: string;
+            description: string | null;
+            priority: TaskPriority;
+            dueDate: string | null;
+        }) => {
+            if (!user || !currentWorkspaceId) return;
+
+            const taskData = {
+                ...data,
+                authorId: user.uid,
+                contextId: currentWorkspaceId,
                 status: TaskStatus.Pending,
-                priority: data.priority,
-                dueDate: data.dueDate || null,
                 createdAt: new Date().toISOString(),
             };
-            setTasks((previousTasks) => [newTask, ...previousTasks]);
+            try {
+                await addDoc(collection(database, 'tasks'), taskData);
+            } catch (error) {
+                console.error('Falha ao adicionar tarefa:', error);
+            }
         },
-        [],
+        [user, currentWorkspaceId],
     );
 
-    const handleDeleteTask = useCallback((taskId: string) => {
-        setTasks((previousTasks) => previousTasks.filter((task) => task.id !== taskId));
+    const handleDeleteTask = useCallback(async (taskId: string) => {
+        try {
+            const taskReference = doc(database, 'tasks', taskId);
+            await deleteDoc(taskReference);
+        } catch (error) {
+            console.error('Falha ao deletar tarefa:', error);
+        }
     }, []);
 
-    const handleToggleTaskStatus = useCallback((taskId: string) => {
-        setTasks((previousTasks) =>
-            previousTasks.map((task) =>
-                task.id === taskId
-                    ? {
-                        ...task,
-                        status: task.status === TaskStatus.Completed ? TaskStatus.Pending : TaskStatus.Completed,
-                    }
-                    : task,
-            ),
-        );
-    }, []);
+    const handleToggleTaskStatus = useCallback(
+        async (taskId: string) => {
+            const taskToUpdate = tasks.find((task) => task.id === taskId);
+            if (!taskToUpdate) return;
 
-    const handleUpdateTask = useCallback((updatedTask: Task) => {
-        setTasks((previousTasks) =>
-            previousTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task)),
-        );
+            const newStatus =
+                taskToUpdate.status === TaskStatus.Completed ? TaskStatus.Pending : TaskStatus.Completed;
+
+            try {
+                const taskReference = doc(database, 'tasks', taskId);
+                await updateDoc(taskReference, { status: newStatus });
+            } catch (error) {
+                console.error('Falha ao atualizar status da tarefa:', error);
+            }
+        },
+        [tasks],
+    );
+
+    const handleUpdateTask = useCallback(async (updatedTask: Task) => {
+        try {
+            const taskReference = doc(database, 'tasks', updatedTask.id);
+            const taskData: Partial<Task> = { ...updatedTask };
+            delete taskData.id;
+            await updateDoc(taskReference, taskData);
+        } catch (error) {
+            console.error('Falha ao atualizar tarefa:', error);
+        }
     }, []);
 
     const filteredTasks = useMemo(() => {
@@ -93,21 +154,18 @@ export function TaskManager() {
         return { total, pending, completed };
     }, [tasks]);
 
-    if (!isClient) {
-        return null;
-    }
-
     return (
         <div className="flex w-full flex-col gap-8">
             <TaskManagerHeader />
             <TaskForm onAddTask={handleAddTask} />
             <div className="flex flex-col gap-4 rounded-lg border bg-card-background p-4 shadow-card data-[theme=dark]:shadow-card-dark sm:p-6">
                 <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-                    <TaskStats stats={taskStats} />
+                    <TaskStats stats={taskStats} isLoading={isLoadingTasks} />
                     <TaskFilters currentFilter={currentFilter} onFilterChange={setCurrentFilter} />
                 </div>
                 <TaskList
                     tasks={filteredTasks}
+                    isLoading={isLoadingTasks}
                     onToggleTaskStatus={handleToggleTaskStatus}
                     onDeleteTask={handleDeleteTask}
                     onUpdateTask={handleUpdateTask}

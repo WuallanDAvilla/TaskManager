@@ -23,4 +23,6 @@ export interface Task {
   priority: TaskPriority;
   dueDate: string | null;
   createdAt: string;
+  authorId: string;
+  contextId: string;
 }
